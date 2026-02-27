@@ -157,6 +157,7 @@ dialog button {
 .gameboard > .line {
     position: absolute;
     border: 3px solid black;
+    visibility: hidden;
 }
 
 .horizontal {
@@ -294,6 +295,11 @@ main > h2 {
 /* Lighter when clicked or held */
 .restart-game-btn:active {
   background-color: rgb(131, 131, 131);
+}
+
+.result > p {
+    /* border: 1px solid blue; */
+    margin: 0;
 }
 
 /* Dark mode */
