@@ -146,7 +146,6 @@ const gameboard = (() => {
         if (col < 0 || col > 2) throw Error("column must be between 0 and 2!");
         
         const piece = gameboardArray[row][col];
-        // console.log(`piece.length = ${piece.length}`);
         if (piece.length === 1) {
             console.log(`\nCell ${row}${col} is already occupied by ${piece}!`);
             return; 
@@ -163,11 +162,6 @@ const gameboard = (() => {
 
         if (detectLineConnection(cell)) { 
             console.log(`Player ${symbol} wins!`);
-            const winningLineFormed = gameboard.getLineFormed();
-            // console.log(`winningLineFormed = ${winningLineFormed}`);
-            const winningLineElement = screenController.getWinningLine(winningLineFormed);
-            if (winningLineElement !== null) winningLineElement.style.visibility = "visible";
-            
             gameEnded = true;
 
             if(symbol === 'X') {
@@ -178,6 +172,9 @@ const gameboard = (() => {
                 const winSpan = document.createElement("span");
                 winSpan.textContent = " wins!";
                 resultDiv.appendChild(winSpan);
+
+                screenController.changeAllCellsCursor("default");
+                audioController.playWin();
             } else {
                 span.textContent = gameController.getPlayer2().getPlayerName();
                 span.style.color = "rgb(223, 53, 53)";
@@ -186,15 +183,27 @@ const gameboard = (() => {
                 const winSpan = document.createElement("span");
                 winSpan.textContent = " wins!";
                 resultDiv.appendChild(winSpan);
+
+                screenController.changeAllCellsCursor("default");
+                audioController.playWin();
             }
         } else if (numSymbolsPlaced === 9) {
             console.log("Draw!");
             gameEnded = true;
             span.textContent = "Draw!";
             resultDiv.appendChild(span);
+
+            screenController.changeAllCellsCursor("default");
+            audioController.playDraw();
         }
 
-        // resultDiv.appendChild(span);
+        const winningLineFormed = gameboard.getLineFormed();
+        const winningLineElement = screenController.getWinningLine(winningLineFormed);
+        if (winningLineElement !== null) { 
+            setTimeout(() => {
+                winningLineElement.style.visibility = "visible";
+            }, 350);
+        }
     }
 
     const getNumSymbolsPlaced = () => numSymbolsPlaced;
@@ -232,11 +241,9 @@ const gameController = (() => {
         if (numPiecesPlaced < 9 && !gameboard.getGameEnded()) {
             if (numPiecesPlaced % 2 === 0) {
                 gameboard.placeSymbol('X', cell);
-                // console.log(`Number of pieces placed: ${gameboard.getNumSymbolsPlaced()}`);
                 if (!gameboard.getGameEnded() && gameboard.getCell(row, col) !== 'O') console.log("\nPlayer O's turn!");
             } else {
                 gameboard.placeSymbol('O', cell);
-                // console.log(`Number of pieces placed: ${gameboard.getNumSymbolsPlaced()}`);
                 if (numPiecesPlaced < 8 && !gameboard.getGameEnded() && gameboard.getCell(row, col) !== 'X') 
                     console.log("\nPlayer X's turn!");
             }
@@ -246,7 +253,6 @@ const gameController = (() => {
     const initGame = () => {
         gameboard.resetBoard();
         console.log("\nPlayer X's turn!");
-        // console.log(`Number of pieces placed: ${gameboard.getNumSymbolsPlaced()}`);
     }
 
     const getPlayer1 = () => player1;
@@ -311,17 +317,18 @@ const screenController = (() => {
             });
 
             const winningLineFormed = gameboard.getLineFormed();
-            // console.log(`winningLineFormed = ${winningLineFormed}`);
 
             const winningLineElement = screenController.getWinningLine(winningLineFormed);
             if (winningLineElement !== null) winningLineElement.style.visibility = "hidden";
 
+            changeAllCellsCursor("pointer");
+            audioController.stopAll();
             gameController.initGame();
-            // console.log("Restarted game!");
         });
     }
     
-    const submitFunctionality = () => {const submitBtn = document.querySelector(".submit-btn");
+    const submitFunctionality = () => {
+        const submitBtn = document.querySelector(".submit-btn");
         submitBtn.addEventListener("click", () => {
             const player1 = document.querySelector("#player1_name").value;
             if (player1.length !== 0) document.querySelector(".player1-name").textContent = player1;
@@ -351,12 +358,14 @@ const screenController = (() => {
         if (gameboard.getGameEnded()) return;
 
         let svg;
+        let soundToPlay;
         // Get the number of pieces placed
         const numPlaced = gameboard.getNumSymbolsPlaced();
         if (numPlaced % 2 === 0) {
-            // Build the svg
+            soundToPlay = audioController.playWriteX;
             svg = buildSvg("alphaX", xDValue);
         } else {
+            soundToPlay = audioController.playWriteO;
             svg = buildSvg("alphaO", oDValue);
         }
 
@@ -364,9 +373,7 @@ const screenController = (() => {
         const classList = [...className.classList];
         const lastClassName = classList.at(-1);
         const cell = document.querySelector(`.${lastClassName}`);
-        // console.log(`cell.childElementCount: ${cell.childElementCount}`);
 
-        // console.log(`lastClassName = ${lastClassName}`);
         switch (lastClassName) {
             case "first":
                 gameController.placePiece("00");
@@ -397,7 +404,15 @@ const screenController = (() => {
                 break;
         }
 
-        if (cell.childElementCount < 1) cell.appendChild(svg);
+        if (cell.childElementCount < 1) { 
+            soundToPlay();
+            setTimeout(() => {
+                cell.appendChild(svg);
+            }, 250);
+
+            // Make the cursor default again
+            cell.style.cursor = "default";
+        }
     }
 
     const addListenersToCells = () => {
@@ -437,12 +452,18 @@ const screenController = (() => {
                 res = document.querySelector(".vertical.line3");
                 return res; 
             default:
-                // res = document.querySelector(".south-east");
                 return null; 
         }
     }
 
-    const screenControllerInit = () => {
+    const changeAllCellsCursor = (cursorVal) => {
+        const allCells = document.querySelectorAll(".cell");
+        allCells.forEach(currCell => {
+            currCell.style.cursor = cursorVal;
+        });
+    }
+
+    const initScreenController = () => {
         addListenersToCells();
         changeNamesFunctionality();
         restartGameFunctionality();
@@ -453,8 +474,14 @@ const screenController = (() => {
         const volumeOn = document.querySelector(".volume-on");
         const volumeOff = document.querySelector(".volume-off");
 
-        volumeOn.addEventListener("click", () => swapSvgs(volumeOn, volumeOff));
-        volumeOff.addEventListener("click", () => swapSvgs(volumeOff, volumeOn));
+        volumeOn.addEventListener("click", () => {
+            audioController.toggleAudio();
+            swapSvgs(volumeOn, volumeOff)
+        });
+        volumeOff.addEventListener("click", () => {
+            audioController.toggleAudio();
+            swapSvgs(volumeOff, volumeOn)
+        });
 
         // Sun and moon
         const sun = document.querySelector(".sun");
@@ -482,10 +509,63 @@ const screenController = (() => {
         });
     }
 
-    return { screenControllerInit, getWinningLine };
+    return { getWinningLine, changeAllCellsCursor, initScreenController };
 
+})();
+
+const audioController = (() => {
+    // *** Properties ***
+    const writeX = new Audio("./audio/writeX.wav");
+    const writeO = new Audio("./audio/writeO.wav");
+    const win = new Audio("./audio/win.mp3");
+    const draw = new Audio("./audio/draw.mp3");
+    let audioDisabled = false;
+
+    // *** Private Methods ***
+
+    // *** Public Methods ***
+    const playWriteX = () => {
+        if (!audioDisabled) {
+            writeX.currentTime = 0;
+            writeX.play();
+        }
+    }
+
+    const playWriteO = () => {
+        if (!audioDisabled) {
+            writeO.currentTime = 0;
+            writeO.play();
+        }
+    }
+
+    const playWin = () => {
+        if (!audioDisabled) {
+            win.currentTime = 0;
+            win.play();
+        }
+    }
+
+    const playDraw = () => {
+        if (!audioDisabled) {
+            draw.currentTime = 0;
+            draw.play();
+        }
+    }
+
+    const stopAll = () => {
+        [writeX, writeO, win, draw].forEach(currSound => {
+            currSound.pause();
+            currSound.currentTime = 0;
+        });
+    }
+
+    const toggleAudio = () => {
+        audioDisabled = !audioDisabled;
+    }
+
+    return { playWriteX, playWriteO, playWin, playDraw, stopAll, toggleAudio };
 })();
 
 // Global calls
 gameController.initGame();
-screenController.screenControllerInit();
+screenController.initScreenController();
